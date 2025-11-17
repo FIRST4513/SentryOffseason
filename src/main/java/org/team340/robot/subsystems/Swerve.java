@@ -41,30 +41,30 @@ public final class Swerve extends GRRSubsystem {
     private final SwerveModuleConfig frontLeft = new SwerveModuleConfig()
         .setName("frontLeft")
         .setLocation(OFFSET, OFFSET)
-        .setMoveMotor(SwerveMotors.talonFX(RobotMap.FL_MOVE, true))
+        .setMoveMotor(SwerveMotors.talonFX(RobotMap.FL_MOVE, false))
         .setTurnMotor(SwerveMotors.talonFX(RobotMap.FL_TURN, true))
-        .setEncoder(SwerveEncoders.cancoder(RobotMap.FL_ENCODER, 0.0, false));
+        .setEncoder(SwerveEncoders.cancoder(RobotMap.FL_ENCODER, -0.37890625, false));
 
     private final SwerveModuleConfig frontRight = new SwerveModuleConfig()
         .setName("frontRight")
         .setLocation(OFFSET, -OFFSET)
         .setMoveMotor(SwerveMotors.talonFX(RobotMap.FR_MOVE, true))
         .setTurnMotor(SwerveMotors.talonFX(RobotMap.FR_TURN, true))
-        .setEncoder(SwerveEncoders.cancoder(RobotMap.FR_ENCODER, 0.0, false));
+        .setEncoder(SwerveEncoders.cancoder(RobotMap.FR_ENCODER, 0.44775390625, false));
 
     private final SwerveModuleConfig backLeft = new SwerveModuleConfig()
         .setName("backLeft")
         .setLocation(-OFFSET, OFFSET)
-        .setMoveMotor(SwerveMotors.talonFX(RobotMap.BL_MOVE, true))
+        .setMoveMotor(SwerveMotors.talonFX(RobotMap.BL_MOVE, false))
         .setTurnMotor(SwerveMotors.talonFX(RobotMap.BL_TURN, true))
-        .setEncoder(SwerveEncoders.cancoder(RobotMap.BL_ENCODER, 0.0, false));
+        .setEncoder(SwerveEncoders.cancoder(RobotMap.BL_ENCODER, 0.048583984375, false));
 
     private final SwerveModuleConfig backRight = new SwerveModuleConfig()
         .setName("backRight")
         .setLocation(-OFFSET, -OFFSET)
         .setMoveMotor(SwerveMotors.talonFX(RobotMap.BR_MOVE, true))
         .setTurnMotor(SwerveMotors.talonFX(RobotMap.BR_TURN, true))
-        .setEncoder(SwerveEncoders.cancoder(RobotMap.BR_ENCODER, 0.0, false));
+        .setEncoder(SwerveEncoders.cancoder(RobotMap.BR_ENCODER, -0.411376953125, false));
 
     private final SwerveConfig config = new SwerveConfig()
         .setTimings(LoggedRobot.DEFAULT_PERIOD, 0.004, 0.02, 0.02)
@@ -73,11 +73,11 @@ public final class Swerve extends GRRSubsystem {
         .setTurnPID(100.0, 0.0, 0.2)
         .setBrakeMode(true, true)
         .setLimits(5.0, 0.01, 18.0, 15.0, 45.0)
-        .setDriverProfile(5.0, 1.5, 0.1, 5.75, 2.0, 0.05)
+        .setDriverProfile(0.5, 1.5, 0.1, 0.75, 2.0, 0.05)
         .setPowerProperties(Constants.VOLTAGE, 100.0, 80.0, 60.0, 60.0)
         .setMechanicalProperties(243.0 / 38.0, 12.1, Units.inchesToMeters(4.0))
         .setOdometryStd(0.1, 0.1, 0.05)
-        .setIMU(SwerveIMUs.canandgyro(RobotMap.CANANDGYRO))
+        .setIMU(SwerveIMUs.pigeon2(RobotMap.CANANDGYRO))
         .setPhoenixFeatures(new CANBus(RobotMap.LOWER_CAN), true, true, true)
         .setModules(frontLeft, frontRight, backLeft, backRight);
 

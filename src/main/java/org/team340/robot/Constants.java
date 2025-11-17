@@ -19,22 +19,41 @@ public final class Constants {
      */
     public static final class RobotMap {
 
-        public static final String LOWER_CAN = "LowerCAN";
+        public static final String LOWER_CAN = "CANFD";
 
-        public static final int FL_MOVE = 2;
-        public static final int FL_TURN = 3;
-        public static final int FR_MOVE = 4;
-        public static final int FR_TURN = 5;
-        public static final int BL_MOVE = 6;
-        public static final int BL_TURN = 7;
-        public static final int BR_MOVE = 8;
-        public static final int BR_TURN = 9;
+        public static final int FL_MOVE = 1;
+        public static final int FL_TURN = 2;
+        public static final int FR_MOVE = 3;
+        public static final int FR_TURN = 4;
+        public static final int BL_MOVE = 7;
+        public static final int BL_TURN = 8;
+        public static final int BR_MOVE = 5;
+        public static final int BR_TURN = 6;
 
-        public static final int FL_ENCODER = 10;
-        public static final int FR_ENCODER = 11;
+        public static final int FL_ENCODER = 9;
+        public static final int FR_ENCODER = 10;
         public static final int BL_ENCODER = 12;
-        public static final int BR_ENCODER = 13;
+        public static final int BR_ENCODER = 11;
 
-        public static final int CANANDGYRO = 14;
+        public static final int CANANDGYRO = 13;
+
+        public static final int ClimberMotorID = 20; // Can ID Kraken
+
+        public static final int IntakeBottomMotorID = 21; //
+        public static final int IntakeTopMotorID = 22;
+
+        public static final int ElevatorMotorID = 15;
+    }
+
+    public final class AnalogPorts {
+
+        public static final int intakeGamepieceSensor = 0;
+
+        //max 4 ports
+    }
+
+    public final class PWMPorts {
+
+        public static final int winchLockID = 9;
     }
 }
