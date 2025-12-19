@@ -7,6 +7,7 @@ import edu.wpi.first.epilogue.NotLogged;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import org.team340.lib.logging.LoggedRobot;
 import org.team340.lib.logging.Profiler;
@@ -97,12 +98,17 @@ public final class Robot extends LoggedRobot {
         driver.povRight().onTrue(ClimberCmds.climberSetStow());
         driver.povRight().onFalse(ClimberCmds.climberStopCmd());
 
+        driver.a().onTrue(new InstantCommand(() -> System.out.println(autos.getSelectedAutoMaybe())));
+
         // Disable loop overrun warnings from the command
         // scheduler, since we already log loop timings
         DisableWatchdog.in(scheduler, "m_watchdog");
 
         // Configure the brownout threshold to match RIO 1
         RobotController.setBrownoutVoltage(6.3);
+
+        // Enable real-time thread priority (whatever that means)
+        enableRT(true);
     }
 
     /**

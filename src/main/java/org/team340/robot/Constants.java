@@ -1,5 +1,9 @@
 package org.team340.robot;
 
+import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Translation3d;
+import org.team340.robot.util.Vision.CameraConfig;
+
 /**
  * The Constants class provides a convenient place for teams to hold robot-wide numerical or boolean
  * constants. This class should not be used for any other purpose. All constants should be declared
@@ -12,6 +16,15 @@ public final class Constants {
     // Controller ports
     public static final int DRIVER = 0;
     public static final int CO_DRIVER = 1;
+
+    public static final CameraConfig[] CAMERAS = {
+        new CameraConfig(
+            "Apriltag Camera",
+            new Translation3d(0.3048, -0.2286, 0.1524),
+            new Rotation3d(0, 0.0872665, 0)
+        ),
+        new CameraConfig("TopApriltag Camera", new Translation3d(0.070, -0.070, 0.990), new Rotation3d(0, 0, 0))
+    };
 
     /**
      * The RobotMap class defines CAN IDs, CAN bus names, DIO/PWM/PH/PCM channel

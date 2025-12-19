@@ -24,7 +24,7 @@ import java.util.Map;
  */
 public final class AutoChooser {
 
-    private static final String DEFAULT = "Do Nothing";
+    private static final String DEFAULT = "Example";
 
     private final StringArrayPublisher optionsPub;
     private final StringPublisher activePub;

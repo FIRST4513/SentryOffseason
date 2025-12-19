@@ -5,14 +5,18 @@ import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.epilogue.NotLogged;
 import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.trajectory.TrapezoidProfile.Constraints;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj2.command.Command;
+import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import org.team340.lib.logging.LoggedRobot;
 import org.team340.lib.math.Math2;
 import org.team340.lib.math.PAPFController;
+import org.team340.lib.math.PAPFController.LineObstacle;
 import org.team340.lib.math.PAPFController.Obstacle;
 import org.team340.lib.swerve.Perspective;
 import org.team340.lib.swerve.SwerveAPI;
@@ -24,9 +28,15 @@ import org.team340.lib.swerve.hardware.SwerveIMUs;
 import org.team340.lib.swerve.hardware.SwerveMotors;
 import org.team340.lib.tunable.TunableTable;
 import org.team340.lib.tunable.Tunables;
+import org.team340.lib.tunable.Tunables.TunableDouble;
+import org.team340.lib.util.Alliance;
+import org.team340.lib.util.Mutable;
 import org.team340.lib.util.command.GRRSubsystem;
 import org.team340.robot.Constants;
 import org.team340.robot.Constants.RobotMap;
+import org.team340.robot.util.Field;
+import org.team340.robot.util.Field.ReefLocation;
+import org.team340.robot.util.Vision;
 
 /**
  * The robot's swerve drivetrain.
@@ -37,6 +47,21 @@ public final class Swerve extends GRRSubsystem {
     private static final double OFFSET = Units.inchesToMeters(12.5);
 
     private static final TunableTable tunables = Tunables.getNested("swerve");
+
+    private static final TunableTable apfTunables = tunables.getNested("apf");
+    private static final TunableDouble apfX = apfTunables.value("x", 1.14);
+    private static final TunableDouble apfVel = apfTunables.value("velocity", 4.5);
+    private static final TunableDouble apfLead = apfTunables.value("lead", 0.45);
+    private static final TunableDouble apfLeadMult = apfTunables.value("leadMult", 0.15);
+    private static final TunableDouble apfLeadAccel = apfTunables.value("leadAccel", 7.7);
+    private static final TunableDouble apfLeadAccelL4 = apfTunables.value("leadAccelL4", 6.95);
+    private static final TunableDouble apfScoreAccel = apfTunables.value("scoreAccel", 6.0);
+    private static final TunableDouble apfScoreAccelL4 = apfTunables.value("scoreAccelL4", 3.5);
+    private static final TunableDouble apfL4Ta = apfTunables.value("apfL4Ta", 4.0);
+    private static final TunableDouble apfAngTolerance = apfTunables.value("angTolerance", 0.4);
+    private static final TunableDouble apfSafeTolerance = apfTunables.value("safeTolerance", 0.2);
+    private static final TunableDouble apfAttractStrength = apfTunables.value("attractStrength", -9.0);
+    private static final TunableDouble apfAttractRange = apfTunables.value("attractRange", 2.5);
 
     private final SwerveModuleConfig frontLeft = new SwerveModuleConfig()
         .setName("frontLeft")
@@ -73,7 +98,7 @@ public final class Swerve extends GRRSubsystem {
         .setTurnPID(100.0, 0.0, 0.2)
         .setBrakeMode(true, true)
         .setLimits(5.0, 0.01, 18.0, 15.0, 45.0)
-        .setDriverProfile(0.5, 1.5, 0.1, 0.75, 2.0, 0.05)
+        .setDriverProfile(1.0, 1.5, 0.1, 1.0, 2.0, 0.05)
         .setPowerProperties(Constants.VOLTAGE, 100.0, 80.0, 60.0, 60.0)
         .setMechanicalProperties(243.0 / 38.0, 12.1, Units.inchesToMeters(4.0))
         .setOdometryStd(0.1, 0.1, 0.05)
@@ -85,12 +110,19 @@ public final class Swerve extends GRRSubsystem {
     private final SwerveState state;
 
     private final SwerveAPI api;
+    private final Vision vision;
+    private boolean seesAprilTag = false;
+
     private final PAPFController apf;
     private final ProfiledPIDController angularPID;
 
+    private final ReefAssistData reefAssist = new ReefAssistData();
+    private Pose2d reefReference = Pose2d.kZero;
+
     public Swerve() {
         api = new SwerveAPI(config);
-        apf = new PAPFController(6.0, 0.25, 0.01, true, new Obstacle[0]);
+        vision = new Vision(Constants.CAMERAS);
+        apf = new PAPFController(6.0, 0.25, 0.01, true, Field.obstacles);
         angularPID = new ProfiledPIDController(8.0, 0.0, 0.0, new Constraints(10.0, 26.0));
         angularPID.enableContinuousInput(-Math.PI, Math.PI);
 
@@ -104,6 +136,23 @@ public final class Swerve extends GRRSubsystem {
     @Override
     public void periodic() {
         api.refresh();
+
+        // Apply vision estimates to the pose estimator.
+        var measurements = vision.getUnreadResults(state.poseHistory, state.odometryPose, state.velocity);
+        //System.out.println(measurements);
+        this.seesAprilTag = measurements.length > 0;
+        api.addVisionMeasurements(measurements);
+
+        // Calculate helpers
+        Translation2d reefCenter = Field.reef.get();
+        Translation2d reefTranslation = state.translation.minus(reefCenter);
+        Rotation2d reefAngle = new Rotation2d(
+            Math.floor(
+                    reefCenter.minus(state.translation).getAngle().plus(new Rotation2d(Math2.SIXTH_PI)).getRadians()
+                        / Math2.THIRD_PI
+                )
+                * Math2.THIRD_PI
+        );
     }
 
     /**
@@ -112,7 +161,10 @@ public final class Swerve extends GRRSubsystem {
      */
     public Command tareRotation() {
         return commandBuilder("Swerve.tareRotation()")
-            .onInitialize(() -> api.tareRotation(Perspective.OPERATOR))
+            .onInitialize(() -> {
+                api.tareRotation(Perspective.OPERATOR);
+                vision.reset();
+            })
             .isFinished(true)
             .ignoringDisable(true);
     }
@@ -161,7 +213,101 @@ public final class Swerve extends GRRSubsystem {
     }
 
     /**
-     * Drives the robot to a target position using the P-APF. This command does not end.
+     * Drives the robot to the reef autonomously.
+     * @param location The reef location to drive to.
+     * @param ready If the robot is ready to approach the scoring location.
+     * @param l4 If the robot is scoring L4.
+     */
+    public Command apfDrive(ReefLocation location, BooleanSupplier ready, BooleanSupplier l4) {
+        return apfDrive(
+            () -> Alliance.isBlue() ? location.side : location.side.rotateBy(Rotation2d.k180deg),
+            () -> location.left,
+            ready,
+            l4
+        );
+    }
+
+    /**
+     * Internal function, converts reef side to APF drive controller.
+     * @param side A supplier that returns the side of the reef to target.
+     * @param left A supplier that returns {@code true} if the robot should target
+     *             the left reef pole, or {@code false} to target the right pole.
+     * @param ready If the robot is ready to approach the scoring location.
+     * @param l4 If the robot is scoring L4.
+     */
+
+    private Command apfDrive(
+        Supplier<Rotation2d> side,
+        BooleanSupplier left,
+        BooleanSupplier ready,
+        BooleanSupplier l4
+    ) {
+        Mutable<Pose2d> lastTarget = new Mutable<>(Pose2d.kZero);
+        Mutable<Double> torqueAccel = new Mutable<>(config.torqueAccel);
+        Mutable<Boolean> nowSafe = new Mutable<>(false);
+
+        return commandBuilder("Swerve.apfDrive()")
+            .onInitialize(() -> {
+                angularPID.reset(state.rotation.getRadians(), state.speeds.omegaRadiansPerSecond);
+
+                lastTarget.value = Pose2d.kZero;
+                torqueAccel.value = config.torqueAccel;
+                nowSafe.value = false;
+            })
+            .onExecute(() -> {
+                Pose2d goal = reefAssist.targetPipe = generateReefLocation(apfX.get(), side.get(), left.getAsBoolean());
+
+                Translation2d error = goal.getTranslation().minus(state.translation);
+                Rotation2d robotAngle = error.getAngle();
+                reefAssist.error = robotAngle.minus(side.get()).getRadians();
+
+                if (!goal.equals(lastTarget.value)) nowSafe.value = false;
+                lastTarget.value = goal;
+
+                if (!nowSafe.value) {
+                    goal = generateReefLocation(
+                        apfX.get() + apfLead.get() + (apfLeadMult.get() * (error.getNorm() - apfLead.get())),
+                        side.get(),
+                        left.getAsBoolean()
+                    );
+
+                    if (
+                        ready.getAsBoolean()
+                        && state.translation.getDistance(goal.getTranslation()) * (Math.abs(reefAssist.error) / Math.PI)
+                        <= apfSafeTolerance.get()
+                        && Math.abs(state.rotation.minus(goal.getRotation()).getRadians()) <= apfAngTolerance.get()
+                    ) {
+                        if (l4.getAsBoolean()) config.torqueAccel = apfL4Ta.get();
+                        nowSafe.value = true;
+                    }
+                }
+
+                double deceleration = !nowSafe.value
+                    ? (l4.getAsBoolean() ? apfLeadAccelL4.get() : apfLeadAccel.get())
+                    : (l4.getAsBoolean() ? apfScoreAccelL4.get() : apfScoreAccel.get());
+
+                Obstacle attract = new LineObstacle(
+                    generateReefLocation(10.0, side.get(), left.getAsBoolean()).getTranslation(),
+                    reefAssist.targetPipe.getTranslation(),
+                    true,
+                    apfAttractStrength.get(),
+                    apfAttractRange.get()
+                );
+
+                var speeds = apf.calculate(state.pose, goal.getTranslation(), apfVel.get(), deceleration, attract);
+
+                speeds.omegaRadiansPerSecond = angularPID.calculate(
+                    state.rotation.getRadians(),
+                    goal.getRotation().getRadians()
+                );
+
+                api.applySpeeds(speeds, Perspective.BLUE, true, true);
+            })
+            .onEnd(() -> config.torqueAccel = torqueAccel.value);
+    }
+
+    /**
+     * Drives the robot to a target position using the P-APF. Thi   s command does not end.
      * @param goal A supplier that returns the target blue-origin relative field location.
      * @param maxDeceleration A supplier that returns the desired deceleration rate of the robot, in m/s/s.
      */
@@ -192,5 +338,31 @@ public final class Swerve extends GRRSubsystem {
      */
     public Command stop(boolean lock) {
         return commandBuilder("Swerve.stop(" + lock + ")").onExecute(() -> api.applyStop(lock));
+    }
+
+    private Pose2d generateReefLocation(double xOffset, Rotation2d side, boolean left) {
+        return new Pose2d(
+            reefReference
+                .getTranslation()
+                .plus(new Translation2d(-xOffset, Field.pipeY * (left ? 1.0 : -1.0)).rotateBy(side)),
+            side
+        );
+    }
+
+    @Logged
+    public final class ReefAssistData {
+
+        private Pose2d targetPipe = Pose2d.kZero;
+        private boolean running = false;
+        private double error = 0.0;
+        private double output = 0.0;
+    }
+
+    public boolean returnTrue() {
+        return true;
+    }
+
+    public boolean returnFalse() {
+        return false;
     }
 }
